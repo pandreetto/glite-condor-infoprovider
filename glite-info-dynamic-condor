@@ -15,6 +15,7 @@
 #   10-Oct-2011: First release
 #   04-Jun-2013: Added Glue2 info
 #   19-Mar-2014: Removed obsolete attribute GLUE2EntityCreationTime
+#   04-Feb-2015: added "queue to job attribute mapping" support
 #
 #     Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -79,7 +80,6 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
   ##   The queue information are stored as variables in the configuration file
 
   constr="JobStatus == 1 || JobStatus == 2"
-  $condorq -global -constr $constr -format "%s " $batchqueue -format "%s\n" JobStatus |
   while read queuename status; do
     eval "let ${queuename}_TotalJobs+=1"
     if (( $status == 1 )); then
@@ -87,7 +87,8 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
     elif (( $status == 2 )); then
       eval "let ${queuename}_RunningJobs+=1"
     fi
-  done
+  done < \
+  <($condorq -global -constr $constr -format "%s " $batchqueue -format "%s\n" JobStatus)
 fi
 
 # Store the common information for all queues
