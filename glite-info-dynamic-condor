@@ -42,14 +42,51 @@ fi
 . $config_file
 
 condorstatus="${condor_path:-/usr/bin}/condor_status ${condor_host:+-pool $condor_host}"
+condorq="${condor_path:-/usr/bin}/condor_q ${condor_host:+-pool $condor_host}"
 
-# Get the queue list from condor
+# How is the CE deployed?
 #
-declare -a queues
-queues=( `$condorstatus -subsystem schedd -format "%s " Name`)
-if [ -z $queues ]; then
-  echo "$0: no queues defined in the collector" >&2
-  exit 1
+
+if [[ "$deployment" == "queue_to_schedd" ]]; then
+  ## There is a schedd per queue (running on the central manager)
+  ##  The queue information are stored as attributes of the schedd's classad
+
+  # Get the queue list from condor
+  #
+  declare -a queues
+  queues=( `$condorstatus -subsystem schedd -format "%s " Name`)
+  if [ -z $queues ]; then
+    echo "$0: no queues defined in the collector" >&2
+    exit 1
+  fi
+  
+  # Retrieve information for each queue
+  #
+  for queue in ${queues[@]}; do
+    queuename=${queue//\@/_}
+    vardef="`$condorstatus -schedd $queue \
+      -format "${queuename}_WaitingJobs=%s " TotalIdleJobs \\
+      -format "${queuename}_RunningJobs=%s " TotalRunningJobs \\
+      -format "${queuename}_TotalJobs=%d " TotalRunningJobs+TotalIdleJobs \\
+      -format "${queuename}_MaxCPUTime=%s " MaxCPUTime \\
+      -format "${queuename}_MaxWallClockTime=%s " MaxWallclockTime \\
+      -format "${queuename}_GlueStatus=%s " GlueStatus`"
+    eval $vardef
+  done
+
+elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
+  ## There is no relation between schedds and queues
+  ##   The queue information are stored as variables in the configuration file
+
+  $condorq -global -format "%s " $batchqueue -format "%s\n" JobStatus |
+  while read queuename status; do
+    eval "let ${queuename}_TotalJobs+=1"
+    if (( $status == 1 )); then
+      eval "let ${queuename}_WaitingJobs+=1"
+    elif (( $status == 2 )); then
+      eval "let ${queuename}_RunningJobs+=1"
+    fi
+  done
 fi
 
 # Store the common information for all queues
@@ -60,24 +97,10 @@ vardef="`$condorstatus -collector \\
   -format "HostsUnclaimed=%s " HostsUnclaimed`"
 eval $vardef
 CondorVersion=`echo $CondorVersion | sed 's/\$CondorVersion: \([^ ]\+\).*$/\1/'`
-
-# Retrieve information for each queue
-#
-for queue in ${queues[@]}; do
-  queuename=${queue//\@/_}
-  vardef="`$condorstatus -schedd $queue \
-    -format "${queuename}_WaitingJobs=%s " TotalIdleJobs \\
-    -format "${queuename}_RunningJobs=%s " TotalRunningJobs \\
-    -format "${queuename}_TotalJobs=%d " TotalRunningJobs+TotalIdleJobs \\
-    -format "${queuename}_MaxCPUTime=%s " MaxCPUTime \\
-    -format "${queuename}_MaxWallClockTime=%s " MaxWallclockTime \\
-    -format "${queuename}_GlueStatus=%s " GlueStatus`"
-  eval $vardef
-done
-
+ 
 timenow=`date -u +%Y-%m-%dT%H:%M:%SZ`
 
-# Print Glue1 informations
+# Print Glue1 information
 #
 if [[ "$outputformat" == "glue1" || "$outputformat" == "both" ]]; then
   if [[ ! -r $glue1_ldif_file ]]; then
@@ -111,7 +134,7 @@ GlueCEStateStatus: \$${queuename}_GlueStatus
   done
 fi
 
-# Print Glue2 informations
+# Print Glue2 information
 #
 if [[ "$outputformat" == "glue2" || "$outputformat" == "both" ]]; then
 
