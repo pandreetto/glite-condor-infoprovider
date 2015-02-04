@@ -1,0 +1,154 @@
+#!/bin/bash
+#
+# File:       glite-info-dynamic-condor
+# Author:     David Rebatto (david.rebatto@mi.infn.it)
+#
+# Description:
+#   Gather queues information from condor collector and schedd daemons,
+#   assuming that there's a schedd per queue and that queues are named
+#   after the schedds' names (name@host).
+#   If a schedd fails in providing information, the corresponding queue
+#   is marked as 'Closed'.
+#
+# Revision History:
+#
+#   10-Oct-2011: First release
+#   04-Jun-2013: Added Glue2 info
+#   19-Mar-2014: Removed obsolete attribute GLUE2EntityCreationTime
+#
+#     Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# Read command line parameter
+#
+config_file=${1:-/etc/lrms/condor.conf}
+if [[ ! -r $config_file ]]; then
+  echo "$0: cannot read configuration file $config_file" >&2
+  exit 1
+fi
+
+# Source the config file
+#
+. $config_file
+
+condorstatus="${condor_path:-/usr/bin}/condor_status ${condor_host:+-pool $condor_host}"
+
+# Get the queue list from condor
+#
+declare -a queues
+queues=( `$condorstatus -subsystem schedd -format "%s " Name`)
+if [ -z $queues ]; then
+  echo "$0: no queues defined in the collector" >&2
+  exit 1
+fi
+
+# Store the common information for all queues
+#
+vardef="`$condorstatus -collector \\
+  -format "CondorVersion='%s' " CondorVersion \\
+  -format "HostsTotal=%s " HostsTotal \\
+  -format "HostsUnclaimed=%s " HostsUnclaimed`"
+eval $vardef
+CondorVersion=`echo $CondorVersion | sed 's/\$CondorVersion: \([^ ]\+\).*$/\1/'`
+
+# Retrieve information for each queue
+#
+for queue in ${queues[@]}; do
+  queuename=${queue//\@/_}
+  vardef="`$condorstatus -schedd $queue \
+    -format "${queuename}_WaitingJobs=%s " TotalIdleJobs \\
+    -format "${queuename}_RunningJobs=%s " TotalRunningJobs \\
+    -format "${queuename}_TotalJobs=%d " TotalRunningJobs+TotalIdleJobs \\
+    -format "${queuename}_MaxCPUTime=%s " MaxCPUTime \\
+    -format "${queuename}_MaxWallClockTime=%s " MaxWallclockTime \\
+    -format "${queuename}_GlueStatus=%s " GlueStatus`"
+  eval $vardef
+done
+
+timenow=`date -u +%Y-%m-%dT%H:%M:%SZ`
+
+# Print Glue1 informations
+#
+if [[ "$outputformat" == "glue1" || "$outputformat" == "both" ]]; then
+  if [[ ! -r $glue1_ldif_file ]]; then
+    echo "$0: cannot read static LDIF file $ldif_file" >&2
+    exit 1
+  fi
+  grep -e 'dn:[ ]*GlueCEUniqueID=' $glue1_ldif_file |
+  while read ldifline ; do
+    queue=${ldifline##*cream-condor-}
+    queue=${queue%%,*}
+    queuename=${queue//\@/_}
+    glueline="\
+$ldifline
+GlueCEInfoLRMSType: condor
+GlueCEInfoLRMSVersion: $CondorVersion
+GlueCEPolicyMaxRunningJobs: $HostsTotal
+GlueCEPolicyAssignedJobSlots: $HostsTotal
+GlueCEInfoTotalCPUs: $HostsTotal
+GlueCEStateFreeCPUs: $HostsUnclaimed
+GlueCEStateFreeJobSlots: $HostsUnclaimed
+GlueCEStateWaitingJobs: \$${queuename}_WaitingJobs
+GlueCEStateRunningJobs: \$${queuename}_RunningJobs
+GlueCEStateTotalJobs: \$${queuename}_TotalJobs
+GlueCEPolicyMaxCPUTime: \$${queuename}_MaxCPUTime
+GlueCEPolicyMaxWallClockTime: \$${queuename}_MaxWallClockTime
+GlueCEPolicyMaxObtainableCPUTime: \$${queuename}_MaxCPUTime
+GlueCEPolicyMaxObtainableWallClockTime: \$${queuename}_MaxWallClockTime
+GlueCEStateStatus: \$${queuename}_GlueStatus
+"
+  eval "echo \"$glueline\""
+  done
+fi
+
+# Print Glue2 informations
+#
+if [[ "$outputformat" == "glue2" || "$outputformat" == "both" ]]; then
+
+  # Computing manager
+  if [[ ! -r $glue2_static_file_computing_manager ]]; then
+    echo "$0: cannot read static LDIF file $glue2_static_file_computing_manager" >&2
+    exit 1
+  fi
+  grep -e 'dn:[ ]*GLUE2ManagerId=' $glue2_static_file_computing_manager |
+  while read ldifline ; do
+    glueline="\
+$ldifline
+GLUE2ManagerProductVersion: $CondorVersion
+"
+  eval "echo \"$glueline\""
+  done
+
+  # Computing share
+  if [[ ! -r $glue2_static_file_computing_share ]]; then
+    echo "$0: cannot read static LDIF file $glue2_static_file_computing_share" >&2
+    exit 1
+  fi
+  grep -e 'dn:[ ]*GLUE2ShareID=' $glue2_static_file_computing_share |
+  while read ldifline ; do
+    queue=${ldifline##*GLUE2ShareID=}
+    queue=${queue%%_*}
+    queuename=${queue//\@/_}
+    glueline="\
+$ldifline
+GLUE2ComputingShareDefaultCPUTime: \$${queuename}_MaxCPUTime
+GLUE2ComputingShareDefaultWallTime: \$${queuename}_MaxWallClockTime
+GLUE2ComputingShareMaxCPUTime: \$${queuename}_MaxCPUTime
+GLUE2ComputingShareMaxWallTime: \$${queuename}_MaxWallClockTime
+GLUE2ComputingShareServingState: \$(echo \$${queuename}_GlueStatus | tr [:upper:] [:lower:])
+GLUE2ComputingShareMaxRunningJobs: $HostsTotal
+GLUE2ComputingShareWaitingJobs: \$${queuename}_WaitingJobs
+"
+  eval "echo \"$glueline\""
+  done
+fi
