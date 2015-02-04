@@ -1,0 +1,71 @@
+#!/bin/sh
+###################################
+#
+#  File: lrmsinfo-condor
+# 
+#  Author: David Rebatto
+#  Email:  david.rebatto@mi.infn.it
+#
+# 30/05/2013: first release 
+#
+###################################
+
+usage_string="Usage: $0 [-p /path/to/condor/executables] [-h <central manager>]"
+
+# Parse the command line options
+while getopts "p:h:" arg
+do
+  case "$arg" in
+  p) cpath="$OPTARG" ;;
+  h) cman="$OPTARG" ;;
+  -) break ;;
+  ?) echo $usage_string
+     exit 1 ;;
+  esac
+done
+
+# Build full condor commands
+condorstatus="${cpath:-/usr/bin}/condor_status ${cman:+-pool $cman}"
+condorq="${cpath:-/usr/bin}/condor_q ${cman:+-pool $cman}"
+
+# Build a reference classAd with MaxWallclockTime 
+# values for all the schedds
+maxwtime=`
+ echo -n "["
+ $condorstatus -subsystem schedd \
+   -format "'%s'=" Name \
+   -format "%d;"   MaxWallclockTime
+ echo "]"
+`
+
+# Build the list of status strings
+states='{"queued","queued","running","done","done","held","done"}'
+
+# ClassAd function to extract the schedd name from the job id
+getqueue='regexps("^([^#]*)", GlobalJobId, "\1")'
+
+# Retrieve information from the collector
+$condorstatus -collector \
+  -format "nactive\t\t%d\n" "HostsTotal-HostsOwner" \
+  -format "nfree\t\t%d\n"   "HostsUnclaimed" \
+  -format "now\t\t%d\n"     "CurrentTime"
+
+# Retrieve the elapsed time between the last two
+# negotiation cycles from negotiator
+$condorstatus -negotiator \
+  -format "schedCycle\t%d\n" "LastNegotiationCyclePeriod0"
+
+# Retrieve the list of all the jobs
+$condorq -global \
+  -format "{" EMPTY \
+  -format "'start': %d, "       "JobStartDate" \
+  -format "'queue': '%s', "     "$getqueue" \
+  -format "'state': '%s', "     "$states[eval(JobStatus)]" \
+  -format "'cpucount': '%d', "  "OrigMaxHosts" \
+  -format "'group': '%s', "     "Group =!= UNDEFINED ? Group : \"N/A\"" \
+  -format "'user': '%s', "      "Owner" \
+  -format "'maxwalltime': %d, " "$maxwtime[$getqueue]" \
+  -format "'qtime': %d, "       "QDate" \
+  -format "'jobid': '%s', "     "GlobalJobId" \
+  -format "}\n" EMPTY 
+
