@@ -78,7 +78,8 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
   ## There is no relation between schedds and queues
   ##   The queue information are stored as variables in the configuration file
 
-  $condorq -global -format "%s " $batchqueue -format "%s\n" JobStatus |
+  constr="JobStatus == 1 || JobStatus == 2"
+  $condorq -global -constr $constr -format "%s " $batchqueue -format "%s\n" JobStatus |
   while read queuename status; do
     eval "let ${queuename}_TotalJobs+=1"
     if (( $status == 1 )); then
