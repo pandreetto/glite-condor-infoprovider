@@ -194,7 +194,7 @@ GLUE2ComputingShareDefaultWallTime: \$${queuename}_MaxWallClockTime
 GLUE2ComputingShareMaxCPUTime: \$${queuename}_MaxCPUTime
 GLUE2ComputingShareMaxWallTime: \$${queuename}_MaxWallClockTime
 GLUE2ComputingShareServingState: \$(echo \$${queuename}_GlueStatus | tr [:upper:] [:lower:])
-GLUE2ComputingShareMaxRunningJobs: $HostsTotal
+GLUE2ComputingShareMaxRunningJobs: $TotalSlots
 GLUE2ComputingShareWaitingJobs: \$${queuename}_WaitingJobs
 "
   eval "echo \"$glueline\""
