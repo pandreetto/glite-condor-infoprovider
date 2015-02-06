@@ -79,6 +79,12 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
   ## There is no relation between schedds and queues
   ##   The queue information are stored as variables in the configuration file
 
+  for queuename in ${queues[@]}; do
+    eval "declare -i ${queuename}_TotalJobs=0"
+    eval "declare -i ${queuename}_WaitingJobs=0"
+    eval "declare -i ${queuename}_RunningJobs=0"
+  done
+
   constr="JobStatus == 1 || JobStatus == 2"
   while read queuename status; do
     eval "let ${queuename}_TotalJobs+=1"
@@ -101,7 +107,22 @@ eval $vardef
 # extract the substring between the first and the second ' '
 CondorVersion=${CondorVersion#* }
 CondorVersion=${CondorVersion%% *}
- 
+
+# Properly handle slots and CPUs counting in a mix
+# of static and partitionable slots.
+while read n1 n2 n3 n4; do
+     let TotalCpus+=n1;
+     let FreeCpus+=n2;
+     let TotalSlots+=n3;
+     let FreeSlots+=n4;
+done < \
+<( $condorstatus -constr 'SlotType != "Dynamic"' \
+  -format "%d "  TotalSlotCpus \
+  -format "%d "  'ifThenElse(SlotType == "Partitionable", Cpus, ifThenElse(State == "Unclaimed", Cpus, 0))' \
+  -format "%d "  'ifThenElse(SlotType == "Partitionable", TotalSlotCpus, 1)' \
+  -format "%d\n" 'ifThenElse(SlotType == "Partitionable", Cpus, ifThenElse(State == "Unclaimed", 1, 0))'
+)
+
 timenow=`date -u +%Y-%m-%dT%H:%M:%SZ`
 
 # Print Glue1 information
