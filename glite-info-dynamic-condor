@@ -98,7 +98,9 @@ vardef="`$condorstatus -collector \\
   -format "HostsTotal=%s " HostsTotal \\
   -format "HostsUnclaimed=%s " HostsUnclaimed`"
 eval $vardef
-CondorVersion=`echo $CondorVersion | sed 's/\$CondorVersion: \([^ ]\+\).*$/\1/'`
+# extract the substring between the first and the second ' '
+CondorVersion=${CondorVersion#* }
+CondorVersion=${CondorVersion%% *}
  
 timenow=`date -u +%Y-%m-%dT%H:%M:%SZ`
 
