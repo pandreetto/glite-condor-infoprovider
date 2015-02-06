@@ -141,11 +141,11 @@ if [[ "$outputformat" == "glue1" || "$outputformat" == "both" ]]; then
 $ldifline
 GlueCEInfoLRMSType: condor
 GlueCEInfoLRMSVersion: $CondorVersion
-GlueCEPolicyMaxRunningJobs: $HostsTotal
-GlueCEPolicyAssignedJobSlots: $HostsTotal
-GlueCEInfoTotalCPUs: $HostsTotal
-GlueCEStateFreeCPUs: $HostsUnclaimed
-GlueCEStateFreeJobSlots: $HostsUnclaimed
+GlueCEPolicyMaxRunningJobs: $TotalSlots
+GlueCEPolicyAssignedJobSlots: $TotalSlots
+GlueCEInfoTotalCPUs: $TotalCpus
+GlueCEStateFreeCPUs: $FreeCpus
+GlueCEStateFreeJobSlots: $FreeSlots
 GlueCEStateWaitingJobs: \$${queuename}_WaitingJobs
 GlueCEStateRunningJobs: \$${queuename}_RunningJobs
 GlueCEStateTotalJobs: \$${queuename}_TotalJobs
