@@ -94,7 +94,7 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
       eval "let ${queuename}_RunningJobs+=1"
     fi
   done < \
-  <($condorq -global -constr "$constr" -format "%s " batchqueue -format "%s\n" JobStatus)
+  <($condorq -global -constr "$constr" -format "%s " $queue_attribute -format "%s\n" JobStatus)
 fi
 
 # Store the common information for all queues
