@@ -71,7 +71,10 @@ if [[ "$deployment" == "queue_to_schedd" ]]; then
       -format "${queuename}_TotalJobs=%d " TotalRunningJobs+TotalIdleJobs \\
       -format "${queuename}_MaxCPUTime=%s " MaxCPUTime \\
       -format "${queuename}_MaxWallClockTime=%s " MaxWallclockTime \\
-      -format "${queuename}_GlueStatus=%s " GlueStatus`"
+      -format "${queuename}_GlueStatus=%s " GlueStatus \\
+      -format "${queuename}_MaxMainMemory=%s " MaxMainMemory \\
+      -format "${queuename}_MaxSlotsPerJob=%s " MaxSlotsPerJob \\
+      -format "${queuename}_MaxVirtualMemory=%s " MaxVirtualMemory`"
     eval $vardef
   done
 
@@ -94,7 +97,7 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
       eval "let ${queuename}_RunningJobs+=1"
     fi
   done < \
-  <($condorq -global -constr "$constr" -format "%s " batchqueue -format "%s\n" JobStatus)
+  <($condorq -global -constr "$constr" -format "%s " $queue_attribute -format "%s\n" JobStatus)
 fi
 
 # Store the common information for all queues
@@ -193,6 +196,9 @@ GLUE2ComputingShareDefaultCPUTime: \$${queuename}_MaxCPUTime
 GLUE2ComputingShareDefaultWallTime: \$${queuename}_MaxWallClockTime
 GLUE2ComputingShareMaxCPUTime: \$${queuename}_MaxCPUTime
 GLUE2ComputingShareMaxWallTime: \$${queuename}_MaxWallClockTime
+GLUE2ComputingShareMaxMainMemory: \$${queuename}_MaxMainMemory
+GLUE2ComputingShareMaxSlotsPerJob: \$${queuename}_MaxSlotsPerJob
+GLUE2ComputingShareMaxVirtualMemory: \$${queuename}_MaxVirtualMemory
 GLUE2ComputingShareServingState: \$(echo \$${queuename}_GlueStatus | tr [:upper:] [:lower:])
 GLUE2ComputingShareMaxRunningJobs: $TotalSlots
 GLUE2ComputingShareWaitingJobs: \$${queuename}_WaitingJobs
