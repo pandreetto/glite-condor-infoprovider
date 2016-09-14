@@ -95,6 +95,10 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
     fi
   done < \
   <($condorq -global -constr "$constr" -format "%s " batchqueue -format "%s\n" JobStatus)
+
+else
+  echo "$0: wrong or missing 'deployment' value in $config_file" >&2
+  exit 1
 fi
 
 # Store the common information for all queues
