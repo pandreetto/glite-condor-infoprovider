@@ -7,42 +7,57 @@
 #  Email:  david.rebatto@mi.infn.it
 #
 # 30/05/2013: first release 
+# 13/09/2016: use configuration file
 #
 ###################################
 
-usage_string="Usage: $0 [-p /path/to/condor/executables] [-h <central manager>]"
+# Read command line parameter
+#
+config_file=${1:-/etc/lrms/condor.conf}
+if [[ ! -r $config_file ]]; then
+  echo "$0: cannot read configuration file $config_file" >&2
+  exit 1
+fi
 
-# Parse the command line options
-while getopts "p:h:" arg
-do
-  case "$arg" in
-  p) cpath="$OPTARG" ;;
-  h) cman="$OPTARG" ;;
-  -) break ;;
-  ?) echo $usage_string
-     exit 1 ;;
-  esac
-done
+# Source the config file
+#
+. $config_file
 
-# Build full condor commands
-condorstatus="${cpath:-/usr/bin}/condor_status ${cman:+-pool $cman}"
-condorq="${cpath:-/usr/bin}/condor_q ${cman:+-pool $cman}"
+condorstatus="${condor_path:-/usr/bin}/condor_status ${condor_host:+-pool $condor_host}"
+condorq="${condor_path:-/usr/bin}/condor_q ${condor_host:+-pool $condor_host}"
 
 # Build a reference classAd with MaxWallclockTime 
-# values for all the schedds
-maxwtime=`
- echo -n "["
- $condorstatus -subsystem schedd \
-   -format "'%s'=" Name \
-   -format "%d;"   MaxWallclockTime
- echo "]"
-`
-
+# values for all the queues
+if [[ "$deployment" == "queue_to_schedd" ]]; then
+  ## There is a schedd per queue (running on the central manager)
+  ##  The queue information are stored as attributes of the schedd's classad
+  maxwtime=$(
+   echo -n "["
+   $condorstatus -subsystem schedd \
+     -format "'%s'=" Name \
+     -format "%d;"   MaxWallclockTime
+   echo "]"
+  )
+  # ClassAd function to extract the schedd name from the job id
+  getqueue='regexps("^([^#]*)", GlobalJobId, "\1")'
+elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
+  ## There is no relation between schedds and queues
+  ##   The queue information are stored as variables in the configuration file
+  maxwtime=$(
+   echo -n "["
+   for queuename in ${queues[@]}; do
+     printf "'%s' = %d;" $queuename $(eval echo \$${queuename}_MaxWallClockTime)
+   done
+   echo "]"
+  )
+  getqueue="$queue_attribute"
+else
+  echo "$0: wrong or missing 'deployment' value in $config_file" >&2
+  exit 1
+fi
+ 
 # Build the list of status strings
 states='{"queued","queued","running","done","done","held","done"}'
-
-# ClassAd function to extract the schedd name from the job id
-getqueue='regexps("^([^#]*)", GlobalJobId, "\1")'
 
 # Retrieve information from the collector
 $condorstatus -collector \
