@@ -45,6 +45,8 @@ fi
 condorstatus="${condor_path:-/usr/bin}/condor_status ${condor_host:+-pool $condor_host}"
 condorq="${condor_path:-/usr/bin}/condor_q ${condor_host:+-pool $condor_host}"
 
+undefintvalue=999999999
+
 # How is the CE deployed?
 #
 
@@ -153,13 +155,13 @@ GlueCEPolicyAssignedJobSlots: $TotalSlots
 GlueCEInfoTotalCPUs: $TotalCpus
 GlueCEStateFreeCPUs: $FreeCpus
 GlueCEStateFreeJobSlots: $FreeSlots
-GlueCEStateWaitingJobs: \$${queuename}_WaitingJobs
-GlueCEStateRunningJobs: \$${queuename}_RunningJobs
-GlueCEStateTotalJobs: \$${queuename}_TotalJobs
-GlueCEPolicyMaxCPUTime: \$${queuename}_MaxCPUTime
-GlueCEPolicyMaxWallClockTime: \$${queuename}_MaxWallClockTime
-GlueCEPolicyMaxObtainableCPUTime: \$${queuename}_MaxCPUTime
-GlueCEPolicyMaxObtainableWallClockTime: \$${queuename}_MaxWallClockTime
+GlueCEStateWaitingJobs: \${${queuename}_WaitingJobs:-${undefintvalue}}
+GlueCEStateRunningJobs: \${${queuename}_RunningJobs:-${undefintvalue}}
+GlueCEStateTotalJobs: \${${queuename}_TotalJobs:-${undefintvalue}}
+GlueCEPolicyMaxCPUTime: \${${queuename}_MaxCPUTime:-${undefintvalue}}
+GlueCEPolicyMaxWallClockTime: \${${queuename}_MaxWallClockTime:-${undefintvalue}}
+GlueCEPolicyMaxObtainableCPUTime: \${${queuename}_MaxCPUTime:-${undefintvalue}}
+GlueCEPolicyMaxObtainableWallClockTime: \${${queuename}_MaxWallClockTime:-${undefintvalue}}
 GlueCEStateStatus: \$${queuename}_GlueStatus
 "
   eval "echo \"$glueline\""
@@ -196,16 +198,16 @@ GLUE2ManagerProductVersion: $CondorVersion
     queuename=${queue//\@/_}
     glueline="\
 $ldifline
-GLUE2ComputingShareDefaultCPUTime: \$${queuename}_MaxCPUTime
-GLUE2ComputingShareDefaultWallTime: \$${queuename}_MaxWallClockTime
-GLUE2ComputingShareMaxCPUTime: \$${queuename}_MaxCPUTime
-GLUE2ComputingShareMaxWallTime: \$${queuename}_MaxWallClockTime
-GLUE2ComputingShareMaxMainMemory: \$${queuename}_MaxMainMemory
-GLUE2ComputingShareMaxSlotsPerJob: \$${queuename}_MaxSlotsPerJob
-GLUE2ComputingShareMaxVirtualMemory: \$${queuename}_MaxVirtualMemory
-GLUE2ComputingShareServingState: \$(echo \$${queuename}_GlueStatus | tr [:upper:] [:lower:])
+GLUE2ComputingShareDefaultCPUTime: \${${queuename}_MaxCPUTime:-${undefintvalue}}
+GLUE2ComputingShareDefaultWallTime: \${${queuename}_MaxWallClockTime:-${undefintvalue}}
+GLUE2ComputingShareMaxCPUTime: \${${queuename}_MaxCPUTime:-${undefintvalue}}
+GLUE2ComputingShareMaxWallTime: \${${queuename}_MaxWallClockTime:-${undefintvalue}}
+GLUE2ComputingShareMaxMainMemory: \${${queuename}_MaxMainMemory:-${undefintvalue}}
+GLUE2ComputingShareMaxSlotsPerJob: \${${queuename}_MaxSlotsPerJob:-${undefintvalue}}
+GLUE2ComputingShareMaxVirtualMemory: \${${queuename}_MaxVirtualMemory:-${undefintvalue}}
+GLUE2ComputingShareServingState: \$(echo \${${queuename}_GlueStatus:-production} | tr [:upper:] [:lower:])
 GLUE2ComputingShareMaxRunningJobs: $TotalSlots
-GLUE2ComputingShareWaitingJobs: \$${queuename}_WaitingJobs
+GLUE2ComputingShareWaitingJobs: \${${queuename}_WaitingJobs:-${undefintvalue}}
 "
   eval "echo \"$glueline\""
   done
