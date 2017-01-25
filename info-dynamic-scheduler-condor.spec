@@ -1,7 +1,7 @@
 Summary: Plugins for the lcg-info-dynamic-scheduler GIP plugin
 Name: lcg-info-dynamic-scheduler-condor
 Version: 1.0
-Release: 1.el7
+Release: 1%{?dist}
 License: Apache Software License
 Vendor: EMI
 URL: http://glite.cern.ch/
