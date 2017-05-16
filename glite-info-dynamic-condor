@@ -64,7 +64,7 @@ if [[ "$deployment" == "queue_to_schedd" ]]; then
   # Retrieve information for each queue
   #
   for queue in ${queues[@]}; do
-    queuename=`echo ${queue} | sed 's/[^a-zA-Z0-9_]/_/g'`
+    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
     vardef="`$condorstatus -schedd $queue \
       -format "${queuename}_WaitingJobs=%s " TotalIdleJobs \\
       -format "${queuename}_RunningJobs=%s " TotalRunningJobs \\
@@ -83,7 +83,7 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
   ##   The queue information are stored as variables in the configuration file
 
   for queue in ${queues[@]}; do
-    queuename=`echo ${queue} | sed 's/[^a-zA-Z0-9_]/_/g'`
+    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
     eval "declare -i ${queuename}_TotalJobs=0"
     eval "declare -i ${queuename}_WaitingJobs=0"
     eval "declare -i ${queuename}_RunningJobs=0"
@@ -91,7 +91,7 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
 
   constr="(JobStatus == 1 || JobStatus == 2)"
   while read queue status; do
-    queuename=`echo ${queue} | sed 's/[^a-zA-Z0-9_]/_/g'`
+    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
     eval "let ${queuename}_TotalJobs+=1"
     if (( $status == 1 )); then
       eval "let ${queuename}_WaitingJobs+=1"
@@ -145,7 +145,7 @@ if [[ "$outputformat" == "glue1" || "$outputformat" == "both" ]]; then
   while read ldifline ; do
     queue=${ldifline##*cream-condor-}
     queue=${queue%%,*}
-    queuename=`echo ${queue} | sed 's/[^a-zA-Z0-9_]/_/g'`
+    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
     glueline="\
 $ldifline
 GlueCEInfoLRMSType: condor
@@ -195,7 +195,7 @@ GLUE2ManagerProductVersion: $CondorVersion
   while read ldifline ; do
     queue=${ldifline##*GLUE2ShareID=}
     queue=${queue%%_*}
-    queuename=`echo ${queue} | sed 's/[^a-zA-Z0-9_]/_/g'`
+    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
     glueline="\
 $ldifline
 GLUE2ComputingShareDefaultCPUTime: \${${queuename}_MaxCPUTime:-999999999}
