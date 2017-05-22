@@ -47,6 +47,9 @@ condorq="${condor_path:-/usr/bin}/condor_q ${condor_host:+-pool $condor_host}"
 
 undefvalue="###DELETE_ME###"
 
+# Remove invalid character from variable names
+function sanitize_name() { tr -c '[:alnum:]' '_'; }
+
 # How is the CE deployed?
 #
 
@@ -66,7 +69,7 @@ if [[ "$deployment" == "queue_to_schedd" ]]; then
   # Retrieve information for each queue
   #
   for queue in ${queues[@]}; do
-    queuename=${queue//\@/_}
+    queuename=`echo ${queue} | sanitize_name`
     vardef="`$condorstatus -schedd $queue \
       -format "${queuename}_WaitingJobs=%s " TotalIdleJobs \\
       -format "${queuename}_RunningJobs=%s " TotalRunningJobs \\
@@ -84,14 +87,16 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
   ## There is no relation between schedds and queues
   ##   The queue information are stored as variables in the configuration file
 
-  for queuename in ${queues[@]}; do
+  for queue in ${queues[@]}; do
+    queuename=`echo ${queue} | sanitize_name`
     eval "declare -i ${queuename}_TotalJobs=0"
     eval "declare -i ${queuename}_WaitingJobs=0"
     eval "declare -i ${queuename}_RunningJobs=0"
   done
 
   constr="(JobStatus == 1 || JobStatus == 2)"
-  while read queuename status; do
+  while read queue status; do
+    queuename=`echo ${queue} | sanitize_name`
     eval "let ${queuename}_TotalJobs+=1"
     if (( $status == 1 )); then
       eval "let ${queuename}_WaitingJobs+=1"
@@ -145,7 +150,7 @@ if [[ "$outputformat" == "glue1" || "$outputformat" == "both" ]]; then
   while read ldifline ; do
     queue=${ldifline##*cream-condor-}
     queue=${queue%%,*}
-    queuename=${queue//\@/_}
+    queuename=`echo ${queue} | sanitize_name`
     glueline="\
 $ldifline
 GlueCEInfoLRMSType: condor
@@ -195,7 +200,7 @@ GLUE2ManagerProductVersion: $CondorVersion
   while read ldifline ; do
     queue=${ldifline##*GLUE2ShareID=}
     queue=${queue%%_*}
-    queuename=${queue//\@/_}
+    queuename=`echo ${queue} | sanitize_name`
     glueline="\
 $ldifline
 GLUE2ComputingShareDefaultCPUTime: \${${queuename}_MaxCPUTime:-${undefvalue}}
