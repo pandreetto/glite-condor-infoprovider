@@ -45,6 +45,11 @@ fi
 condorstatus="${condor_path:-/usr/bin}/condor_status ${condor_host:+-pool $condor_host}"
 condorq="${condor_path:-/usr/bin}/condor_q ${condor_host:+-pool $condor_host}"
 
+undefvalue="###DELETE_ME###"
+
+# Remove invalid character from variable names
+function sanitize_name() { tr -c '[:alnum:]' '_'; }
+
 # How is the CE deployed?
 #
 
@@ -64,7 +69,7 @@ if [[ "$deployment" == "queue_to_schedd" ]]; then
   # Retrieve information for each queue
   #
   for queue in ${queues[@]}; do
-    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
+    queuename=`echo ${queue} | sanitize_name`
     vardef="`$condorstatus -schedd $queue \
       -format "${queuename}_WaitingJobs=%s " TotalIdleJobs \\
       -format "${queuename}_RunningJobs=%s " TotalRunningJobs \\
@@ -83,7 +88,7 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
   ##   The queue information are stored as variables in the configuration file
 
   for queue in ${queues[@]}; do
-    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
+    queuename=`echo ${queue} | sanitize_name`
     eval "declare -i ${queuename}_TotalJobs=0"
     eval "declare -i ${queuename}_WaitingJobs=0"
     eval "declare -i ${queuename}_RunningJobs=0"
@@ -91,7 +96,7 @@ elif [[ "$deployment" == "queue_to_jobattribute" ]]; then
 
   constr="(JobStatus == 1 || JobStatus == 2)"
   while read queue status; do
-    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
+    queuename=`echo ${queue} | sanitize_name`
     eval "let ${queuename}_TotalJobs+=1"
     if (( $status == 1 )); then
       eval "let ${queuename}_WaitingJobs+=1"
@@ -145,7 +150,7 @@ if [[ "$outputformat" == "glue1" || "$outputformat" == "both" ]]; then
   while read ldifline ; do
     queue=${ldifline##*cream-condor-}
     queue=${queue%%,*}
-    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
+    queuename=`echo ${queue} | sanitize_name`
     glueline="\
 $ldifline
 GlueCEInfoLRMSType: condor
@@ -155,16 +160,16 @@ GlueCEPolicyAssignedJobSlots: $TotalSlots
 GlueCEInfoTotalCPUs: $TotalCpus
 GlueCEStateFreeCPUs: $FreeCpus
 GlueCEStateFreeJobSlots: $FreeSlots
-GlueCEStateWaitingJobs: \${${queuename}_WaitingJobs:-444444}
-GlueCEStateRunningJobs: \${${queuename}_RunningJobs:-0}
-GlueCEStateTotalJobs: \${${queuename}_TotalJobs:-0}
-GlueCEPolicyMaxCPUTime: \${${queuename}_MaxCPUTime:-999999999}
-GlueCEPolicyMaxWallClockTime: \${${queuename}_MaxWallClockTime:-999999999}
-GlueCEPolicyMaxObtainableCPUTime: \${${queuename}_MaxCPUTime:-999999999}
-GlueCEPolicyMaxObtainableWallClockTime: \${${queuename}_MaxWallClockTime:-999999999}
-GlueCEStateStatus: \${${queuename}_GlueStatus:-Production}
+GlueCEStateWaitingJobs: \${${queuename}_WaitingJobs:-${undefvalue}}
+GlueCEStateRunningJobs: \${${queuename}_RunningJobs:-${undefvalue}}
+GlueCEStateTotalJobs: \${${queuename}_TotalJobs:-${undefvalue}}
+GlueCEPolicyMaxCPUTime: \${${queuename}_MaxCPUTime:-${undefvalue}}
+GlueCEPolicyMaxWallClockTime: \${${queuename}_MaxWallClockTime:-${undefvalue}}
+GlueCEPolicyMaxObtainableCPUTime: \${${queuename}_MaxCPUTime:-${undefvalue}}
+GlueCEPolicyMaxObtainableWallClockTime: \${${queuename}_MaxWallClockTime:-${undefvalue}}
+GlueCEStateStatus: \${${queuename}_GlueStatus:-${undefvalue}}
 "
-  eval "echo \"$glueline\""
+  eval "echo \"$glueline\" | grep -v \"$undefvalue\""
   done
 fi
 
@@ -195,20 +200,20 @@ GLUE2ManagerProductVersion: $CondorVersion
   while read ldifline ; do
     queue=${ldifline##*GLUE2ShareID=}
     queue=${queue%%_*}
-    queuename=`echo ${queue} | grep -Eo '^[^@]+'`
+    queuename=`echo ${queue} | sanitize_name`
     glueline="\
 $ldifline
-GLUE2ComputingShareDefaultCPUTime: \${${queuename}_MaxCPUTime:-999999999}
-GLUE2ComputingShareDefaultWallTime: \${${queuename}_MaxWallClockTime:-999999999}
-GLUE2ComputingShareMaxCPUTime: \${${queuename}_MaxCPUTime:-999999999}
-GLUE2ComputingShareMaxWallTime: \${${queuename}_MaxWallClockTime:-999999999}
-GLUE2ComputingShareMaxMainMemory: \${${queuename}_MaxMainMemory:-444444}
-GLUE2ComputingShareMaxSlotsPerJob: \${${queuename}_MaxSlotsPerJob:-444444}
-GLUE2ComputingShareMaxVirtualMemory: \${${queuename}_MaxVirtualMemory:-444444}
+GLUE2ComputingShareDefaultCPUTime: \${${queuename}_MaxCPUTime:-${undefvalue}}
+GLUE2ComputingShareDefaultWallTime: \${${queuename}_MaxWallClockTime:-${undefvalue}}
+GLUE2ComputingShareMaxCPUTime: \${${queuename}_MaxCPUTime:-${undefvalue}}
+GLUE2ComputingShareMaxWallTime: \${${queuename}_MaxWallClockTime:-${undefvalue}}
+GLUE2ComputingShareMaxMainMemory: \${${queuename}_MaxMainMemory:-${undefvalue}}
+GLUE2ComputingShareMaxSlotsPerJob: \${${queuename}_MaxSlotsPerJob:-${undefvalue}}
+GLUE2ComputingShareMaxVirtualMemory: \${${queuename}_MaxVirtualMemory:-${undefvalue}}
 GLUE2ComputingShareServingState: \$(echo \${${queuename}_GlueStatus:-production} | tr [:upper:] [:lower:])
 GLUE2ComputingShareMaxRunningJobs: $TotalSlots
-GLUE2ComputingShareWaitingJobs: \${${queuename}_WaitingJobs:-444444}
+GLUE2ComputingShareWaitingJobs: \${${queuename}_WaitingJobs:-${undefvalue}}
 "
-  eval "echo \"$glueline\""
+  eval "echo \"$glueline\" | grep -v \"$undefvalue\""
   done
 fi
